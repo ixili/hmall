@@ -1,0 +1,8 @@
+/hm-service/src/main/resources/application-dev.yaml
+**/target/
+.idea
+*.iml
+*.class
+*Test.java
+**/test/
+/hm-service/src/main/resources/application-local.yaml
