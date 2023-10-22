@@ -1,5 +1,6 @@
 package com.hmall.cart.service.impl;
 
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -16,6 +17,8 @@ import com.hmall.common.utils.CollUtils;
 import com.hmall.common.utils.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -42,8 +45,8 @@ import java.util.stream.Collectors;
 public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements ICartService {
 
 //    private final IItemService itemService;
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
+    private final DiscoveryClient discoveryClient;
 
     @Override
     public void addItem2Cart(CartFormDTO cartFormDTO) {
@@ -90,9 +93,15 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements IC
         // 1.获取商品id
         Set<Long> itemIds = vos.stream().map(CartVO::getItemId).collect(Collectors.toSet());
         // 2.查询商品
+        // 2.1 发现item-service服务的实例列表
+        List<ServiceInstance> instances = discoveryClient.getInstances("item-service");
+        // 2.2负载均衡，挑选一个实例
+        ServiceInstance instance = instances.get(RandomUtil.randomInt(instances.size()));
+        // 2.3发送请求，查询商品
 //        List<ItemDTO> items = itemService.queryItemByIds(itemIds);
         ResponseEntity<List<ItemDTO>> response = restTemplate.exchange(
-                "http://localhost:8081/items?ids={ids}",// 请求路径
+                instance.getUri() + "/items?ids={ids}",
+//                "http://localhost:8081/items?ids={ids}",// 请求路径
                 HttpMethod.GET, // 请求方式
                 null,// 请求实体，可以为空
                 new ParameterizedTypeReference<List<ItemDTO>>() {
