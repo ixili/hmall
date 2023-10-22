@@ -55,4 +55,10 @@ hm:
       - /users/login
       - /items/**
       - /hi
+
+
+feign:
+  okhttp:
+    enabled: true # 开启OKHttp功能
+
 # keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123
