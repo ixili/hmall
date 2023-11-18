@@ -15,6 +15,8 @@ import com.hmall.pay.enums.PayStatus;
 import com.hmall.pay.mapper.PayOrderMapper;
 import com.hmall.pay.service.IPayOrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ import java.time.LocalDateTime;
  *
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> implements IPayOrderService {
 
@@ -34,13 +37,7 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
 
     private final TradeClient tradeClient;
 
-    @Override
-    public String applyPayOrder(PayApplyDTO applyDTO) {
-        // 1.幂等性校验
-        PayOrder payOrder = checkIdempotent(applyDTO);
-        // 2.返回结果
-        return payOrder.getId().toString();
-    }
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     @Transactional
@@ -60,8 +57,42 @@ public class PayOrderServiceImpl extends ServiceImpl<PayOrderMapper, PayOrder> i
             throw new BizIllegalException("交易已支付或关闭！");
         }
         // 5.修改订单状态
-        tradeClient.markOrderPaySuccess(po.getBizOrderNo());
+        // tradeClient.markOrderPaySuccess(po.getBizOrderNo());
+        try {
+            rabbitTemplate.convertAndSend("pay.topic", "pay.success", po.getBizOrderNo());
+        } catch (Exception e) {
+            log.error("支付成功的消息发送失败，支付单id：{}， 交易单id：{}", po.getId(), po.getBizOrderNo(), e);
+        }
     }
+
+    @Override
+    public String applyPayOrder(PayApplyDTO applyDTO) {
+        // 1.幂等性校验
+        PayOrder payOrder = checkIdempotent(applyDTO);
+        // 2.返回结果
+        return payOrder.getId().toString();
+    }
+
+//    @Override
+//    @Transactional
+//    public void tryPayOrderByBalance(PayOrderDTO payOrderDTO) {
+//        // 1.查询支付单
+//        PayOrder po = getById(payOrderDTO.getId());
+//        // 2.判断状态
+//        if(!PayStatus.WAIT_BUYER_PAY.equalsValue(po.getStatus())){
+//            // 订单不是未支付，状态异常
+//            throw new BizIllegalException("交易已支付或关闭！");
+//        }
+//        // 3.尝试扣减余额
+//        userClient.deductMoney(payOrderDTO.getPw(), po.getAmount());
+//        // 4.修改支付单状态
+//        boolean success = markPayOrderSuccess(payOrderDTO.getId(), LocalDateTime.now());
+//        if (!success) {
+//            throw new BizIllegalException("交易已支付或关闭！");
+//        }
+//        // 5.修改订单状态
+//        tradeClient.markOrderPaySuccess(po.getBizOrderNo());
+//    }
 
     public boolean markPayOrderSuccess(Long id, LocalDateTime successTime) {
         return lambdaUpdate()

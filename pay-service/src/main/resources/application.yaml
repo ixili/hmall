@@ -10,6 +10,13 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: ${hm.db.pw}
+
+  rabbitmq:
+    host: ${spring.rabbitmq.host} # 你的虚拟机IP
+    port: 5672 # 端口
+    virtual-host: / # 虚拟主机
+    username: ${spring.rabbitmq.username} # 用户名
+    password: ${spring.rabbitmq.password} # 密码
 mybatis-plus:
   configuration:
     default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
